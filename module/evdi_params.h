@@ -13,6 +13,10 @@
  * 日志等级。只有 >= evdi_loglevel 的日志才会打印。
  */
 extern unsigned int evdi_loglevel;
+
+/**
+ * 初始设备数量。在 evdi_init 中添加初始设备。
+ */
 extern unsigned short int evdi_initial_device_count;
 
 #endif /* EVDI_PARAMS_H */
