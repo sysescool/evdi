@@ -210,6 +210,7 @@ static struct platform_driver evdi_platform_driver = {
 	}
 };
 
+// 模块入口函数
 static int __init evdi_init(void)
 {
 	int ret;
@@ -240,6 +241,7 @@ static int __init evdi_init(void)
 	return 0;
 }
 
+// 模块出口函数
 static void __exit evdi_exit(void)
 {
 	EVDI_CHECKPT();
@@ -257,5 +259,6 @@ static void __exit evdi_exit(void)
 	EVDI_INFO("Exit %s driver\n", DRIVER_NAME);
 }
 
+// 这是模块的入口和出口函数，告诉内核：加载时调用 evdi_init，卸载时调用 evdi_exit
 module_init(evdi_init);
 module_exit(evdi_exit);
