@@ -335,7 +335,7 @@ static int __init evdi_init(void)
 	// 2. 初始化全局上下文结构。
 	memset(&g_ctx, 0, sizeof(g_ctx));
 
-	// 3. 注册根设备（在 /sys 下创建目录）
+	// 3. 注册根设备（在 /sys/devices 下创建目录）
 	g_ctx.root_dev = root_device_register(DRIVER_NAME);
 #ifdef CONFIG_USB_SUPPORT  // https://www.kernelconfig.io/config_usb_support
 	g_ctx.usb_notifier.notifier_call = evdi_platform_drv_usb;
