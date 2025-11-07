@@ -18,6 +18,13 @@
 #define EVDI_LOGLEVEL_DEBUG   5
 #define EVDI_LOGLEVEL_VERBOSE 6
 
+/**
+ * 打印日志
+ * @param KERN_LEVEL 日志级别
+ * @param LEVEL 日志级别，根据 evdi_loglevel 决定了是否打印日志
+ * @param FORMAT_STR 日志格式
+ * @param ... 日志参数
+ */
 #define EVDI_PRINTK(KERN_LEVEL, LEVEL, FORMAT_STR, ...)	do { \
 	if (evdi_loglevel >= LEVEL) {\
 		printk(KERN_LEVEL "evdi: " FORMAT_STR, ##__VA_ARGS__); \

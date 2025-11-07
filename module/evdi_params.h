@@ -9,6 +9,9 @@
 #ifndef EVDI_PARAMS_H
 #define EVDI_PARAMS_H
 
+/**
+ * 日志等级。只有 >= evdi_loglevel 的日志才会打印。
+ */
 extern unsigned int evdi_loglevel;
 extern unsigned short int evdi_initial_device_count;
 
