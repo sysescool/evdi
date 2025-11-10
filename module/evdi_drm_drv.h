@@ -44,6 +44,36 @@
 struct evdi_fbdev;
 struct evdi_painter;
 
+/**
+ * EVDI 设备结构体: 代表一个虚拟显示器设备。
+ * @param ddev DRM 设备指针: 代表一个 DRM 设备。
+ * @param conn 连接器指针: 代表一个显示器。
+ *             在 DRM 框架中，连接器 = 物理显示器接口（如 HDMI、DP）。
+ *             `xrandr` 等工具通过连接器查询显示器信息。
+ * @param cursor 光标指针: 代表一个光标。
+ *               - 管理鼠标光标的显示
+ *               - 存储光标图像、位置、热点等信息
+ *               - 处理光标的合成和更新
+ * @param cursor_events_enabled 是否启用光标事件
+ * @param pixel_area_limit 像素区域限制: 限制单次更新的最大像素数量，防止一次性更新过多数据导致系统卡顿。
+ * @param pixel_per_second_limit 每秒像素限制: 限制每秒更新的最大像素数量，防止一次性更新过多数据导致系统卡顿。
+ * @param fbdev 帧缓冲设备指针
+ *        - 提供传统的帧缓冲接口（/dev/fbX）
+ *        - 兼容旧的应用程序（不使用 DRM）
+ * @param painter 与用户空间通信的对象指针
+ *        - 处理所有 ioctl 命令
+ *        - 管理用户空间的连接状态
+ *        - 存储 EDID 数据
+ *        - 管理脏矩形（需要更新的区域）
+ * @param i2c_adapter I2C 适配器指针
+ *        - 模拟 I2C 总线
+ *        - 用于 EDID 和 DDC/CI 通信
+ *        - 让系统认为虚拟显示器有真实的 I2C 接口
+ * @param dev_index 设备索引
+ *        - 设备的编号（0, 1, 2...）
+ *        - 对应 `/dev/dri/card0`, `/dev/dri/card1` 等
+ * @note 在 evdi_drm_device_init 函数中初始化。
+ */
 struct evdi_device {
 	struct drm_device *ddev;
 	struct drm_connector *conn;
