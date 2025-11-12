@@ -90,6 +90,32 @@ struct evdi_device {
 	int dev_index;
 };
 
+
+/**
+ * GEM 对象结构体: 代表一个 GEM 对象。
+ * @param base DRM 基类：
+ *        GEM 的基类结构体，包含了 DRM 子系统通用的 GEM 对象信息，比如大小、引用计数等。
+ * @param pages 物理页面数组：
+ *        Linux 内核把物理内存拆分成 4KB 左右的 页面(page)。就是这个 GEM 对象实际占用的物理内存块。
+ * @param pages_pin_count 页面引用计数：
+ *        “固定”意味着这个页面不能被交换出去（swap out），必须一直在内存中。
+ *        GPU 使用这个 buffer 时，会增加 pin count；用完就减少。
+ * @param pages_lock 保护页面的锁：
+ *        多线程/多进程访问同一内存对象时，需要加锁，避免竞争条件。
+ * @param vmapping 虚拟地址映射：
+ *        Linux 内核使用 虚拟地址映射来访问物理内存。GPU buffer 一般映射到 CPU 地址空间，这样 CPU 就能读写了。
+ * @param vmap_is_iomem 是否是 IOMEM 映射
+ *        IOMEM（I/O memory）通常是 GPU 或显卡寄存器所在的物理地址。
+ *        CPU 对 IOMEM 的访问要特殊处理（比如不能随便缓存）。
+ * @param sg 散列表（用于 DMA）
+ *        scatter-gather table。用于 DMA（Direct Memory Access）。
+ *        把不连续的物理页面拼成一个连续逻辑区域，让 GPU 或其他设备访问。
+ * @param allow_sw_cursor_rect_updates 是否允许软件光标更新：
+ *        允许的话，驱动会在软件中直接管理光标的矩形区域，而不是通过硬件。
+ *        适合低性能 CPU 或嵌入式系统，因为省去了硬件光标支持的开销。
+ *        如果允许，CPU 可以更新 buffer 的光标部分，而不是 GPU。
+ * @note 在 evdi_gem_alloc_object 函数中初始化。
+ */
 struct evdi_gem_object {
 	struct drm_gem_object base;
 	struct page **pages;
