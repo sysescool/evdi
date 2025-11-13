@@ -63,10 +63,20 @@ struct drm_evdi_request_update {
 };
 
 enum drm_evdi_grabpix_mode {
-	EVDI_GRABPIX_MODE_RECTS = 0,
-	EVDI_GRABPIX_MODE_DIRTY = 1,
+	EVDI_GRABPIX_MODE_RECTS = 0, // 抓取矩形区域
+	EVDI_GRABPIX_MODE_DIRTY = 1, // 抓取脏矩形区域
 };
 
+/**
+ * 抓取像素。
+ * @param mode 抓取模式
+ * @param buf_width 缓冲区宽度
+ * @param buf_height 缓冲区高度
+ * @param buf_byte_stride 缓冲区字节步长
+ * @param buffer 缓冲区指针：用于存储抓取的像素数据；
+ * @param num_rects 脏矩形数量：用于存储抓取的脏矩形数量；
+ * @param rects 脏矩形指针：用于存储抓取的脏矩形数据；
+ */
 struct drm_evdi_grabpix {
 	enum drm_evdi_grabpix_mode mode;
 	int32_t buf_width;

@@ -87,6 +87,29 @@ struct evdi_event_ddcci_data_pending {
 #define I2C_ADDRESS_DDCCI 0x37
 #define DDCCI_TIMEOUT_MS 50
 
+/**
+ * EVDI drm painter private structure: DRM 画家结构体。
+ * @param is_connected 显示器是否被“连接”；
+ * @param edid 显示器 EDID 数据
+ * @param edid_length EDID 数据长度
+ * @param lock 画家互斥锁
+ * @param dirty_rects 脏矩形：用于追踪哪些区域需要刷新（dirty rectangles）；让虚拟显示器只更新屏幕上变化的部分，优化性能。
+ * @param num_dirts 脏矩形数量
+ * @param scanout_fb 扫描输出帧缓冲区：用于存储显示器的内容；
+ * @param drm_filp DRM 文件：用于内核与用户态通信；
+ * @param drm_device DRM 设备：用于内核与用户态通信；
+ * @param was_update_requested 是否有用户请求屏幕更新
+ * @param needs_full_modeset 是否需要完整的屏幕模式设置
+ * @param crtc CRTC：显示控制器对象
+ * @param vblank 垂直空白事件：垂直同步事件，用于帧同步（避免撕裂）
+ * @param pending_events 待处理事件：用于存储待处理的事件；
+ * @param send_events_work 发送事件工作：延迟工作队列，用于批量发送事件。
+ * @param ddcci_response_received 接收 DDCCI 响应完成同步等待 DDC/CI 响应；
+ * @param ddcci_buffer DDCCI 缓冲区：用于存储 DDC/CI 响应数据；
+ * @param ddcci_buffer_length DDCCI 缓冲区长度：用于存储 DDC/CI 响应数据长度；
+ * @param vt_notifier VT 通知器：用于监听 VT 切换事件；
+ * @param fg_console 前台控制台：用于存储前台控制台；
+ */
 struct evdi_painter {
 	bool is_connected;
 	struct edid *edid;
@@ -446,6 +469,12 @@ static struct drm_pending_event *create_cursor_set_event(
 	return &event->base;
 }
 
+/**
+ * 发送光标设置事件。
+ * @param painter 画家指针
+ * @param cursor 光标指针
+ * @note 在 evdi_crtc_cursor_set 函数中调用。
+ */
 void evdi_painter_send_cursor_set(struct evdi_painter *painter,
 				  struct evdi_cursor *cursor)
 {
@@ -480,6 +509,12 @@ static struct drm_pending_event *create_cursor_move_event(
 	return &event->base;
 }
 
+/**
+ * 发送光标移动事件。
+ * @param painter 画家指针
+ * @param cursor 光标指针
+ * @note 在 evdi_crtc_cursor_move 函数中调用。
+ */
 void evdi_painter_send_cursor_move(struct evdi_painter *painter,
 				   struct evdi_cursor *cursor)
 {
@@ -596,6 +631,12 @@ unlock:
 	return rect;
 }
 
+/**
+ * 标记为脏。
+ * @param evdi evdi 设备
+ * @param dirty_rect 脏矩形
+ * @note 在 evdi_fb_fillrect、evdi_fb_copyarea、evdi_fb_imageblit 函数中调用。
+ */
 void evdi_painter_mark_dirty(struct evdi_device *evdi,
 			     const struct drm_clip_rect *dirty_rect)
 {
@@ -659,6 +700,13 @@ static void evdi_painter_send_vblank(struct evdi_painter *painter)
 	painter->vblank = NULL;
 }
 
+/**
+ * 设置垂直空白事件。
+ * @param painter 画家指针
+ * @param crtc CRTC 指针
+ * @param vblank 垂直空白事件指针
+ * @note 在 evdi_painter_send_vblank 函数中调用。
+ */
 void evdi_painter_set_vblank(
 	struct evdi_painter *painter,
 	struct drm_crtc *crtc,
@@ -684,6 +732,11 @@ void evdi_painter_set_vblank(
 	}
 }
 
+/**
+ * 发送更新就绪事件。
+ * @param painter 画家指针
+ * @note 在 evdi_crtc_atomic_flush 函数中调用。
+ */
 void evdi_painter_send_update_ready_if_needed(struct evdi_painter *painter)
 {
 	EVDI_CHECKPT();
@@ -706,6 +759,12 @@ void evdi_painter_send_update_ready_if_needed(struct evdi_painter *painter)
 
 static const char * const dpms_str[] = { "on", "standby", "suspend", "off" };
 
+/**
+ * 通知显示器电源状态。
+ * @param painter 画家指针
+ * @param mode 电源状态
+ * @note 在 evdi_crtc_atomic_update 函数中调用。
+ */
 void evdi_painter_dpms_notify(struct evdi_painter *painter, int mode)
 {
 	const char *mode_str;
@@ -751,6 +810,12 @@ static void evdi_log_pixel_format(uint32_t pixel_format,
 #endif
 }
 
+/**
+ * 通知模式改变。
+ * @param evdi evdi 设备
+ * @param new_mode 新的模式
+ * @note 在 evdi_crtc_atomic_update 函数中调用。
+ */
 void evdi_painter_mode_changed_notify(struct evdi_device *evdi,
 				      struct drm_display_mode *new_mode)
 {
@@ -853,6 +918,17 @@ static void evdi_remove_i2c_adapter(struct evdi_device *evdi)
 	}
 }
 
+/**
+ * 连接显示器。
+ * @param evdi evdi 设备
+ * @param edid_data EDID 数据
+ * @param edid_length EDID 数据长度
+ * @param pixel_area_limit 像素区域限制
+ * @param pixel_per_second_limit 每秒像素限制
+ * @param file DRM 文件
+ * @param dev_index 设备索引
+ * @return 0 成功，其他 失败
+ */
 static int
 evdi_painter_connect(struct evdi_device *evdi,
 		     void const __user *edid_data, unsigned int edid_length,
@@ -877,6 +953,7 @@ evdi_painter_connect(struct evdi_device *evdi,
 		return -EINVAL;
 	}
 
+	// 拷贝 EDID 数据到新的 EDID 结构体
 	new_edid = kzalloc(edid_length, GFP_KERNEL);
 	if (!new_edid)
 		return -ENOMEM;
@@ -896,6 +973,7 @@ evdi_painter_connect(struct evdi_device *evdi,
 		return -EINVAL;
 	}
 
+	// 如果显示器已连接，则替换 DRM 文件
 	if (painter->drm_filp)
 		EVDI_WARN("(card%d) Double connect - replacing %p with %p\n",
 			  evdi->dev_index, painter->drm_filp, file);
@@ -904,13 +982,20 @@ evdi_painter_connect(struct evdi_device *evdi,
 
 	evdi->pixel_area_limit = pixel_area_limit;
 	evdi->pixel_per_second_limit = pixel_per_second_limit;
+	// 设置新的 DRM 文件
 	painter->drm_filp = file;
+	// 释放旧的 EDID 数据
 	kfree(painter->edid);
+	// 设置新的 EDID 数据长度
 	painter->edid_length = edid_length;
+	// 设置新的 EDID 数据
 	painter->edid = new_edid;
+	// 设置显示器已连接
 	painter->is_connected = true;
+	// 设置需要完整的屏幕模式设置
 	painter->needs_full_modeset = true;
 
+	// 如果 I2C 适配器未添加，则添加 I2C 适配器
 	if (!evdi->i2c_adapter)
 		evdi_add_i2c_adapter(evdi);
 
@@ -918,8 +1003,11 @@ evdi_painter_connect(struct evdi_device *evdi,
 
 	EVDI_INFO("(card%d) Connected with %s\n", evdi->dev_index, buf);
 
+	// 触发 HPD 中断事件
+	// 通知 DRM 框架显示器已连接
 	drm_helper_hpd_irq_event(evdi->ddev);
 
+	// 返回成功
 	return 0;
 }
 
@@ -981,9 +1069,18 @@ void evdi_painter_close(struct evdi_device *evdi, struct drm_file *file)
 		evdi_painter_disconnect(evdi, file);
 }
 
+/**
+ * 连接显示器。
+ * @param drm_dev DRM 设备
+ * @param data 数据指针
+ * @param file DRM 文件
+ * @return 0 成功，其他 失败
+ * @note 在 evdi_painter_connect_ioctl 函数中调用。
+ */
 int evdi_painter_connect_ioctl(struct drm_device *drm_dev, void *data,
 			       struct drm_file *file)
 {
+	// 获取 evdi 设备
 	struct evdi_device *evdi = drm_dev->dev_private;
 	struct evdi_painter *painter = evdi->painter;
 	struct drm_evdi_connect *cmd = data;
@@ -991,6 +1088,7 @@ int evdi_painter_connect_ioctl(struct drm_device *drm_dev, void *data,
 
 	EVDI_CHECKPT();
 	if (painter) {
+		// 如果显示器被连接，则连接显示器，否则断开
 		if (cmd->connected)
 			ret = evdi_painter_connect(evdi,
 					     cmd->edid,
@@ -1012,6 +1110,14 @@ int evdi_painter_connect_ioctl(struct drm_device *drm_dev, void *data,
 	return -ENODEV;
 }
 
+/**
+ * 抓取像素。
+ * @param drm_dev DRM 设备
+ * @param data 数据指针
+ * @param file DRM 文件
+ * @return 0 成功，其他 失败
+ * @note 在 evdi_painter_grabpix_ioctl 函数中调用。
+ */
 int evdi_painter_grabpix_ioctl(struct drm_device *drm_dev, void *data,
 			       __always_unused struct drm_file *file)
 {
@@ -1028,11 +1134,13 @@ int evdi_painter_grabpix_ioctl(struct drm_device *drm_dev, void *data,
 
 	EVDI_CHECKPT();
 
+	// 如果抓取模式不是脏矩形区域，则返回错误
 	if (cmd->mode != EVDI_GRABPIX_MODE_DIRTY) {
 		EVDI_ERROR("Unknown command mode\n");
 		return -EINVAL;
 	}
 
+	// 如果脏矩形数量小于1，则返回错误
 	if (cmd->num_rects < 1) {
 		EVDI_ERROR("No space for clip rects\n");
 		return -EINVAL;
@@ -1054,19 +1162,25 @@ int evdi_painter_grabpix_ioctl(struct drm_device *drm_dev, void *data,
 		goto err_painter;
 	}
 
+	// 合并脏矩形
 	merge_dirty_rects(&painter->dirty_rects[0],
 			  &painter->num_dirts);
+	// 如果脏矩形数量大于命令数量，则压缩脏矩形
 	if (painter->num_dirts > cmd->num_rects)
 		collapse_dirty_rects(&painter->dirty_rects[0],
 				     &painter->num_dirts);
 
+	// 设置命令数量
 	cmd->num_rects = painter->num_dirts;
+	// 拷贝脏矩形到命令
 	memcpy(dirty_rects, painter->dirty_rects,
 	       painter->num_dirts * sizeof(painter->dirty_rects[0]));
 
+	// 获取扫描输出帧缓冲区
 	efb = painter->scanout_fb;
 
 	if (!efb) {
+		// 如果扫描输出帧缓冲区未设置，则返回错误
 		EVDI_ERROR("Scanout buffer not set\n");
 		err = -EAGAIN;
 		goto err_painter;
@@ -1074,23 +1188,30 @@ int evdi_painter_grabpix_ioctl(struct drm_device *drm_dev, void *data,
 
 	painter->num_dirts = 0;
 
+	// 获取扫描输出帧缓冲区
 	drm_framebuffer_get(&efb->base);
 
+	// 获取 CRTC
 	crtc = painter->crtc;
+	// 设置 CRTC 为空
 	painter->crtc = NULL;
 
+	// 获取垂直空白事件
 	vblank = painter->vblank;
+	// 设置垂直空白事件为空
 	painter->vblank = NULL;
 
 
 	painter_unlock(painter);
 
+	// 如果扫描输出帧缓冲区未映射，则映射扫描输出帧缓冲区
 	if (!efb->obj->vmapping) {
 		if (evdi_gem_vmap(efb->obj) == -ENOMEM) {
 			EVDI_ERROR("Failed to map scanout buffer\n");
 			err = -EFAULT;
 			goto err_fb;
 		}
+		// 如果扫描输出帧缓冲区未映射，则返回错误
 		if (!efb->obj->vmapping) {
 			EVDI_ERROR("Inexistent vmapping\n");
 			err = -EFAULT;
@@ -1098,6 +1219,7 @@ int evdi_painter_grabpix_ioctl(struct drm_device *drm_dev, void *data,
 		}
 	}
 
+	// 如果缓冲区宽度或高度不匹配，则返回错误
 	if ((unsigned int)cmd->buf_width != efb->base.width ||
 		(unsigned int)cmd->buf_height != efb->base.height) {
 		EVDI_DEBUG("Invalid buffer dimension\n");
@@ -1105,13 +1227,16 @@ int evdi_painter_grabpix_ioctl(struct drm_device *drm_dev, void *data,
 		goto err_fb;
 	}
 
+	// 拷贝脏矩形到命令
 	if (copy_to_user(cmd->rects, dirty_rects,
 		cmd->num_rects * sizeof(cmd->rects[0]))) {
 		err = -EFAULT;
 		goto err_fb;
 	}
 
+	// 获取 DMA 缓冲区附件
 	import_attach = efb->obj->base.import_attach;
+	// 如果 DMA 缓冲区附件存在，则开始 CPU 访问
 	if (import_attach) {
 		ret = dma_buf_begin_cpu_access(import_attach->dmabuf,
 					       DMA_FROM_DEVICE);
@@ -1121,6 +1246,7 @@ int evdi_painter_grabpix_ioctl(struct drm_device *drm_dev, void *data,
 		}
 	}
 
+	// 拷贝主像素，从扫描输出帧缓冲区拷贝到命令缓冲区
 	err = copy_primary_pixels(efb,
 				  cmd->buffer,
 				  cmd->buf_byte_stride,
@@ -1128,19 +1254,24 @@ int evdi_painter_grabpix_ioctl(struct drm_device *drm_dev, void *data,
 				  dirty_rects,
 				  cmd->buf_width,
 				  cmd->buf_height);
+	// 如果拷贝主像素成功，并且光标事件未启用，则拷贝光标像素
 	if (err == 0 && !evdi->cursor_events_enabled)
+		// 拷贝光标像素，从扫描输出帧缓冲区拷贝到命令缓冲区
 		copy_cursor_pixels(efb,
 				   cmd->buffer,
 				   cmd->buf_byte_stride,
 				   evdi->cursor);
 
+	// 如果 DMA 缓冲区附件存在，则结束 CPU 访问
 	if (import_attach)
 		dma_buf_end_cpu_access(import_attach->dmabuf,
 				       DMA_FROM_DEVICE);
 
 err_fb:
+	// 发送垂直空白事件
 	evdi_send_vblank(crtc, vblank);
 
+	// 释放扫描输出帧缓冲区
 	drm_framebuffer_put(&efb->base);
 
 	return err;
@@ -1150,6 +1281,14 @@ err_painter:
 	return err;
 }
 
+/**
+ * 请求屏幕更新。
+ * @param drm_dev DRM 设备
+ * @param data 数据指针
+ * @param file DRM 文件
+ * @return 0 成功，其他 失败
+ * @note 在 evdi_painter_request_update_ioctl 函数中调用。
+ */
 int evdi_painter_request_update_ioctl(struct drm_device *drm_dev,
 				      __always_unused void *data,
 				      __always_unused struct drm_file *file)
@@ -1158,17 +1297,21 @@ int evdi_painter_request_update_ioctl(struct drm_device *drm_dev,
 	struct evdi_painter *painter = evdi->painter;
 	int result = 0;
 
+	// 如果画家存在，则请求屏幕更新
 	if (painter) {
 		painter_lock(painter);
 
+		// 如果屏幕更新已请求，则忽略
 		if (painter->was_update_requested) {
 			EVDI_WARN
 			  ("(card%d) Update was already requested - ignoring\n",
 			   evdi->dev_index);
 		} else {
+			// 如果脏矩形数量大于0，则设置屏幕更新已请求
 			if (painter->num_dirts > 0)
 				result = 1;
 			else
+				// 如果脏矩形数量为0，则设置屏幕更新已请求
 				painter->was_update_requested = true;
 		}
 
@@ -1180,6 +1323,11 @@ int evdi_painter_request_update_ioctl(struct drm_device *drm_dev,
 	}
 }
 
+/**
+ * 发送事件工作。
+ * @param work 工作指针
+ * @note 在 evdi_painter_init 函数中调用。
+ */
 static void evdi_send_events_work(struct work_struct *work)
 {
 	struct evdi_painter *painter =
@@ -1223,18 +1371,34 @@ static void evdi_painter_unregister_from_vt(struct evdi_painter *painter)
 	EVDI_TEST_HOOK(evdi_testhook_painter_vt_register(&painter->vt_notifier));
 }
 
+/**
+ * 初始化画家。
+ * @param dev evdi 设备
+ * @return 0 成功，其他 失败
+ * @note 在 evdi_drm_device_create 函数中调用。
+ */
 int evdi_painter_init(struct evdi_device *dev)
 {
 	EVDI_CHECKPT();
+	// 分配画家结构体
 	dev->painter = kzalloc(sizeof(*dev->painter), GFP_KERNEL);
+	// 如果画家结构体分配成功，则初始化画家结构体
 	if (dev->painter) {
+		// 初始化画家互斥锁
 		mutex_init(&dev->painter->lock);
+		// 设置 EDID 数据为空
 		dev->painter->edid = NULL;
+		// 设置 EDID 数据长度为0
 		dev->painter->edid_length = 0;
+		// 设置需要完整的屏幕模式设置
 		dev->painter->needs_full_modeset = true;
+		// 设置 CRTC 为空
 		dev->painter->crtc = NULL;
+		// 设置垂直空白事件为空
 		dev->painter->vblank = NULL;
+		// 设置 DRM 设备
 		dev->painter->drm_device = dev->ddev;
+		// 注册到 VT 通知器
 		evdi_painter_register_to_vt(dev->painter);
 
 		INIT_LIST_HEAD(&dev->painter->pending_events);
@@ -1272,6 +1436,12 @@ void evdi_painter_cleanup(struct evdi_painter *painter)
 	kfree(painter);
 }
 
+/**
+ * 设置扫描输出帧缓冲区。
+ * @param painter 画家指针
+ * @param newfb 新的帧缓冲区
+ * @note 在 evdi_crtc_atomic_update 函数中调用。
+ */
 void evdi_painter_set_scanout_buffer(struct evdi_painter *painter,
 				     struct evdi_framebuffer *newfb)
 {
@@ -1379,6 +1549,14 @@ bool evdi_painter_i2c_data_notify(struct evdi_painter *painter, struct i2c_msg *
 	return true;
 }
 
+/**
+ * 处理 DDC/CI 响应。
+ * @param drm_dev DRM 设备
+ * @param data 数据指针
+ * @param file DRM 文件
+ * @return 0 成功，其他 失败
+ * @note 在 evdi_painter_ddcci_response_ioctl 函数中调用。
+ */
 int evdi_painter_ddcci_response_ioctl(struct drm_device *drm_dev, void *data,
 				__always_unused struct drm_file *file)
 {
@@ -1390,6 +1568,7 @@ int evdi_painter_ddcci_response_ioctl(struct drm_device *drm_dev, void *data,
 	painter_lock(painter);
 
 	// Truncate any read to 64 bytes
+	// 设置 DDC/CI 响应缓冲区长度
 	painter->ddcci_buffer_length = min_t(uint32_t, cmd->buffer_length,
 					     DDCCI_BUFFER_SIZE);
 
@@ -1401,6 +1580,7 @@ int evdi_painter_ddcci_response_ioctl(struct drm_device *drm_dev, void *data,
 		goto unlock;
 	}
 
+	// 拷贝 DDC/CI 响应缓冲区
 	if (copy_from_user(painter->ddcci_buffer, cmd->buffer,
 		painter->ddcci_buffer_length)) {
 		EVDI_ERROR("Failed to read ddcci_buffer\n");
@@ -1410,6 +1590,7 @@ int evdi_painter_ddcci_response_ioctl(struct drm_device *drm_dev, void *data,
 		goto unlock;
 	}
 
+	// 完成 DDC/CI 响应
 	complete(&painter->ddcci_response_received);
 
 unlock:
@@ -1417,6 +1598,14 @@ unlock:
 	return result;
 }
 
+/**
+ * 启用光标事件。
+ * @param drm_dev DRM 设备
+ * @param data 数据指针
+ * @param file DRM 文件
+ * @return 0 成功，其他 失败
+ * @note 在 evdi_painter_enable_cursor_events_ioctl 函数中调用。
+ */
 int evdi_painter_enable_cursor_events_ioctl(struct drm_device *drm_dev, void *data,
 					__always_unused struct drm_file *file)
 {
