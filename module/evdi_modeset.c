@@ -398,6 +398,11 @@ static const struct drm_plane_helper_funcs evdi_plane_helper_funcs = {
 #endif
 };
 
+/**
+ * 光标平面辅助函数。
+ * @param dev DRM 设备指针
+ * @note 在 evdi_crtc_init 函数中调用。
+ */
 static const struct drm_plane_helper_funcs evdi_cursor_helper_funcs = {
 	.atomic_update = evdi_cursor_atomic_update,
 #if KERNEL_VERSION(5, 13, 0) <= LINUX_VERSION_CODE || defined(EL8)
@@ -461,6 +466,12 @@ static struct drm_plane *evdi_create_plane(
 	return plane;
 }
 
+/**
+ * 初始化 CRTC。
+ * @param dev DRM 设备指针
+ * @return 0 成功，其他 失败
+ * @note 在 evdi_modeset_init 函数中调用。
+ */
 static int evdi_crtc_init(struct drm_device *dev)
 {
 	struct drm_crtc *crtc = NULL;
@@ -469,22 +480,27 @@ static int evdi_crtc_init(struct drm_device *dev)
 	int status = 0;
 
 	EVDI_CHECKPT();
+	// 1. 分配 CRTC 结构体
 	crtc = kzalloc(sizeof(struct drm_crtc), GFP_KERNEL);
 	if (crtc == NULL)
 		return -ENOMEM;
 
+	// 2. 初始化主平面
 	primary_plane = evdi_create_plane(dev, DRM_PLANE_TYPE_PRIMARY,
 					  &evdi_plane_helper_funcs);
 
 #if KERNEL_VERSION(5, 10, 0) <= LINUX_VERSION_CODE || defined(EL8)
+	// 3. 初始化光标平面
 	cursor_plane = evdi_create_plane(dev, DRM_PLANE_TYPE_CURSOR,
 						&evdi_cursor_helper_funcs);
 #endif
 
 #if KERNEL_VERSION(5, 0, 0) <= LINUX_VERSION_CODE || defined(EL8)
+	// 4. 启用脏矩形支持
 	drm_plane_enable_fb_damage_clips(primary_plane);
 #endif
 
+	// 5. 初始化 CRTC
 	status = drm_crtc_init_with_planes(dev, crtc,
 					   primary_plane, cursor_plane,
 					   &evdi_crtc_funcs,
@@ -492,11 +508,17 @@ static int evdi_crtc_init(struct drm_device *dev)
 					   );
 
 	EVDI_DEBUG("drm_crtc_init: %d p%p\n", status, primary_plane);
+	// 6. 添加 CRTC 辅助函数
 	drm_crtc_helper_add(crtc, &evdi_helper_funcs);
 
 	return 0;
 }
 
+/**
+ * 模式配置函数。
+ * @param dev DRM 设备指针
+ * @note 在 evdi_modeset_init 函数中调用。
+ */
 static const struct drm_mode_config_funcs evdi_mode_funcs = {
 	.fb_create = evdi_fb_user_fb_create,
 #if KERNEL_VERSION(6, 11, 0) < LINUX_VERSION_CODE || defined(EL9)
@@ -507,31 +529,45 @@ static const struct drm_mode_config_funcs evdi_mode_funcs = {
 	.atomic_check = drm_atomic_helper_check
 };
 
+/**
+ * 初始化模式设置。
+ * @param dev DRM 设备指针
+ * @note 在 evdi_drm_device_init 函数中调用。
+ */
 void evdi_modeset_init(struct drm_device *dev)
 {
 	struct drm_encoder *encoder;
 
 	EVDI_CHECKPT();
 
+	// 1. 初始化模式配置
 	drm_mode_config_init(dev);
 
+	// 2. 设置最小分辨率
 	dev->mode_config.min_width = 64;
 	dev->mode_config.min_height = 64;
 
+	// 3. 设置最大分辨率
 	dev->mode_config.max_width = 7680;
 	dev->mode_config.max_height = 4320;
 
+	// 4. 设置阴影模式
 	dev->mode_config.prefer_shadow = 0;
 	dev->mode_config.preferred_depth = 24;
 
+	// 5. 设置模式配置函数
 	dev->mode_config.funcs = &evdi_mode_funcs;
 
+	// 6. 初始化 CRTC
 	evdi_crtc_init(dev);
 
+	// 7. 初始化编码器
 	encoder = evdi_encoder_init(dev);
 
+	// 8. 初始化连接器
 	evdi_connector_init(dev, encoder);
 
+	// 9. 重置模式配置
 	drm_mode_config_reset(dev);
 }
 

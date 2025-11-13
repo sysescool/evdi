@@ -717,7 +717,6 @@ int evdi_fb_get_bpp(uint32_t format)
  * @param info 格式信息指针
  * @param mode_cmd 模式命令指针
  * @return 帧缓冲区指针，成功返回，失败返回错误码
- * @note 在 evdi_fb_user_fb_create 函数中调用。
  */
 struct drm_framebuffer *evdi_fb_user_fb_create(
 					struct drm_device *dev,
