@@ -32,8 +32,19 @@
 #include "evdi_cursor.h"
 #include "evdi_drm_drv.h"
 
-/*
- * EVDI drm cursor private structure.
+/**
+ * EVDI drm cursor private structure: DRM 光标结构体。
+ * @param enabled 是否启用
+ * @param x 光标横坐标
+ * @param y 光标纵坐标
+ * @param width 光标宽度
+ * @param height 光标高度
+ * @param hot_x 光标热点横坐标（在光标图像内部的偏移）
+ * @param hot_y 光标热点纵坐标（在光标图像内部的偏移）
+ * @param pixel_format 光标像素格式
+ * @param stride 光标步长
+ * @param obj 光标 GEM 对象
+ * @param lock 光标互斥锁
  */
 struct evdi_cursor {
 	bool enabled;
@@ -49,6 +60,12 @@ struct evdi_cursor {
 	struct mutex lock;
 };
 
+/**
+ * 设置光标 GEM 对象。
+ * @param cursor 光标指针
+ * @param obj 光标 GEM 对象
+ * @note 在 evdi_cursor_set 函数中调用。
+ */
 static void evdi_cursor_set_gem(struct evdi_cursor *cursor,
 				struct evdi_gem_object *obj)
 {
@@ -64,11 +81,23 @@ static void evdi_cursor_set_gem(struct evdi_cursor *cursor,
 	cursor->obj = obj;
 }
 
+/**
+ * 获取光标 GEM 对象。
+ * @param cursor 光标指针
+ * @return 光标 GEM 对象
+ * @note 在 evdi_cursor_set 函数中调用。
+ */
 struct evdi_gem_object *evdi_cursor_gem(struct evdi_cursor *cursor)
 {
 	return cursor->obj;
 }
 
+/**
+ * 初始化光标。
+ * @param cursor 光标指针
+ * @return 0 成功，其他 失败
+ * @note 在 evdi_drm_device_init 函数中调用。
+ */
 int evdi_cursor_init(struct evdi_cursor **cursor)
 {
 	if (WARN_ON(*cursor))
@@ -101,11 +130,25 @@ void evdi_cursor_free(struct evdi_cursor *cursor)
 	kfree(cursor);
 }
 
+/**
+ * 获取光标是否启用。
+ * @param cursor 光标指针
+ * @return 是否启用
+ * @note 在 evdi_crtc_cursor_set 函数中调用。
+ */
 bool evdi_cursor_enabled(struct evdi_cursor *cursor)
 {
 	return cursor->enabled;
 }
 
+/**
+ * 启用/禁用光标。
+ * @param cursor 光标指针
+ * @param enable 是否启用
+ * @note 在 evdi_crtc_cursor_set 函数中调用。
+ *       - 当光标不显示时，需要释放 GEM 对象，避免内存泄漏。
+ *       - 当光标显示时，需要获取 GEM 对象，避免内存泄漏。
+ */
 void evdi_cursor_enable(struct evdi_cursor *cursor, bool enable)
 {
 	evdi_cursor_lock(cursor);
@@ -115,6 +158,18 @@ void evdi_cursor_enable(struct evdi_cursor *cursor, bool enable)
 	evdi_cursor_unlock(cursor);
 }
 
+/**
+ * 设置光标。
+ * @param cursor 光标指针
+ * @param obj 光标 GEM 对象
+ * @param width 光标宽度
+ * @param height 光标高度
+ * @param hot_x 光标热点横坐标
+ * @param hot_y 光标热点纵坐标
+ * @param pixel_format 光标像素格式
+ * @param stride 光标步长
+ * @note 在 evdi_crtc_cursor_set 函数中调用。
+ */
 void evdi_cursor_set(struct evdi_cursor *cursor,
 		     struct evdi_gem_object *obj,
 		     uint32_t width, uint32_t height,
@@ -139,11 +194,19 @@ void evdi_cursor_set(struct evdi_cursor *cursor,
 	cursor->hot_y = hot_y;
 	cursor->pixel_format = pixel_format;
 	cursor->stride = stride;
+	// 保存光标 GEM 对象
 	evdi_cursor_set_gem(cursor, obj);
 
 	evdi_cursor_unlock(cursor);
 }
 
+/**
+ * 移动光标。
+ * @param cursor 光标指针
+ * @param x 光标横坐标
+ * @param y 光标纵坐标
+ * @note 在 evdi_cursor_atomic_update 函数中调用。
+ */
 void evdi_cursor_move(struct evdi_cursor *cursor, int32_t x, int32_t y)
 {
 	evdi_cursor_lock(cursor);
@@ -174,6 +237,15 @@ static inline uint32_t blend_alpha(const uint32_t pixel_val32,
 				(blend_val32 & 0xff0000) >> 16, alpha) << 16;
 }
 
+/**
+ * 合成光标像素。
+ * @param buffer 缓冲区指针
+ * @param cursor_value 光标像素值
+ * @param fb_value 帧缓冲区像素值
+ * @param cmd_offset 命令偏移
+ * @return 0 成功，其他 失败
+ * @note 在 evdi_cursor_compose_and_copy 函数中调用。
+ */
 static int evdi_cursor_compose_pixel(char __user *buffer,
 				     int const cursor_value,
 				     int const fb_value,
@@ -184,6 +256,15 @@ static int evdi_cursor_compose_pixel(char __user *buffer,
 	return copy_to_user(buffer + cmd_offset, &composed_value, 4);
 }
 
+/**
+ * 合成光标并复制到帧缓冲区。
+ * @param cursor 光标指针
+ * @param efb 帧缓冲区指针
+ * @param buffer 缓冲区指针
+ * @param buf_byte_stride 缓冲区步长
+ * @return 0 成功，其他 失败
+ * @note 在 evdi_cursor_atomic_update 函数中调用。
+ */
 int evdi_cursor_compose_and_copy(struct evdi_cursor *cursor,
 				 struct evdi_framebuffer *efb,
 				 char __user *buffer,
@@ -191,11 +272,16 @@ int evdi_cursor_compose_and_copy(struct evdi_cursor *cursor,
 {
 	int x, y;
 	struct drm_framebuffer *fb = &efb->base;
+	// 光标宽度的一半
 	const int h_cursor_w = cursor->width >> 1;
+	// 光标高度的一半
 	const int h_cursor_h = cursor->height >> 1;
+	// 光标缓冲区指针
 	uint32_t *cursor_buffer = NULL;
+	// 光标像素格式
 	uint32_t bytespp = 0;
 
+	// 如果光标未启用，则返回0
 	if (!cursor->enabled)
 		return 0;
 
@@ -205,6 +291,7 @@ int evdi_cursor_compose_and_copy(struct evdi_cursor *cursor,
 	if (!cursor->obj->vmapping)
 		return -EINVAL;
 
+	// 获取光标像素格式
 	bytespp = evdi_fb_get_bpp(cursor->pixel_format);
 	bytespp = DIV_ROUND_UP(bytespp, 8);
 	if (bytespp != 4) {
@@ -212,22 +299,28 @@ int evdi_cursor_compose_and_copy(struct evdi_cursor *cursor,
 		return -EINVAL;
 	}
 
+	// 检查光标大小是否超过 GEM 对象大小
 	if (cursor->width * cursor->height * bytespp >
 	    cursor->obj->base.size){
 		EVDI_ERROR("Wrong cursor size\n");
 		return -EINVAL;
 	}
 
+	// 获取光标缓冲区指针
 	cursor_buffer = (uint32_t *)cursor->obj->vmapping;
 
+	// 遍历光标缓冲区
 	for (y = -h_cursor_h; y < h_cursor_h; ++y) {
+		// 遍历光标宽度
 		for (x = -h_cursor_w; x < h_cursor_w; ++x) {
 			uint32_t curs_val;
 			int *fbsrc;
 			int fb_value;
 			int cmd_offset;
 			int cursor_pix;
+			// 光标像素横坐标
 			int const mouse_pix_x = cursor->x + x + h_cursor_w;
+			// 光标像素纵坐标
 			int const mouse_pix_y = cursor->y + y + h_cursor_h;
 			bool const is_pix_sane =
 				mouse_pix_x >= 0 &&
@@ -238,14 +331,20 @@ int evdi_cursor_compose_and_copy(struct evdi_cursor *cursor,
 			if (!is_pix_sane)
 				continue;
 
+			// 计算光标像素索引
 			cursor_pix = h_cursor_w+x +
 				    (h_cursor_h+y)*cursor->width;
+			// 获取光标像素值
 			curs_val = le32_to_cpu(cursor_buffer[cursor_pix]);
+			// 获取帧缓冲区像素值
 			fbsrc = (int *)(efb->obj->vmapping + fb->offsets[0]);
+			// 计算帧缓冲区像素索引
 			fb_value = *(fbsrc + ((fb->pitches[0]>>2) *
 						  mouse_pix_y + mouse_pix_x));
+			// 计算命令偏移
 			cmd_offset = (buf_byte_stride * mouse_pix_y) +
 						       (mouse_pix_x * bytespp);
+			// 合成光标像素
 			if (evdi_cursor_compose_pixel(buffer,
 						      curs_val,
 						      fb_value,
