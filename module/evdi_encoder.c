@@ -46,6 +46,13 @@ static const struct drm_encoder_funcs evdi_enc_funcs = {
 	.destroy = evdi_enc_destroy,
 };
 
+/**
+ * 初始化编码器。
+ * @param dev DRM 设备指针
+ * @return 编码器指针
+ * @note 在 evdi_modeset_init 函数中调用。
+ *       - 编码器是 DRM 显示流水线的一部分，负责把 CRTC 输出的数字信号转换成具体的物理接口格式（如 TMDS / HDMI / DP / 虚拟信号）。
+ */
 struct drm_encoder *evdi_encoder_init(struct drm_device *dev)
 {
 	struct drm_encoder *encoder;
