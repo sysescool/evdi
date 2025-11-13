@@ -131,6 +131,17 @@ struct evdi_gem_object {
 
 #define to_evdi_bo(x) container_of(x, struct evdi_gem_object, base)
 
+/**
+ * 帧缓冲区结构体: 代表一个帧缓冲区。
+ * @param base DRM 基类：
+ *        DRM 基类结构体，包含了 DRM 子系统通用的帧缓冲区信息，比如大小、引用计数等。
+ * @param obj GEM 对象指针：
+ *        GEM 对象指针，代表了帧缓冲区实际占用的物理内存。
+ * @param active 是否激活：
+ *        true 表示帧缓冲区正在使用，false 表示帧缓冲区未使用。
+ * @note 在 evdi_fb_user_fb_create 函数中初始化。
+ *       - 帧缓冲区是 GPU 的输出缓冲区，用于存储渲染后的图像数据。
+ */
 struct evdi_framebuffer {
 	struct drm_framebuffer base;
 	struct evdi_gem_object *obj;
