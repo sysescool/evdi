@@ -556,6 +556,8 @@ void evdi_gem_free_object(struct drm_gem_object *gem_obj)
 int evdi_gem_mmap(struct drm_file *file,
 		  struct drm_device *dev, uint32_t handle, uint64_t *offset)
 {
+	(void)dev;
+
 	struct evdi_gem_object *gobj;
 	struct drm_gem_object *obj;
 	int ret = 0;

@@ -55,6 +55,10 @@
 	EVDI_PRINTK(KERN_DEFAULT, EVDI_LOGLEVEL_VERBOSE,\
 		    "[V] %s:%d " FORMAT_STR, __func__, __LINE__, ##__VA_ARGS__)
 
+#define EVDI_BEGIN() EVDI_VERBOSE("+++ %s() %d @ %s :%d +++\n", __func__, current->pid, __FILE__, __LINE__)
+// TODO: 添加一个线程 ID，用于区分不同线程的日志。
+#define EVDI_END() EVDI_VERBOSE("--- %s() %d @ %s :%d ---\n", __func__, current->pid, __FILE__, __LINE__)
+
 #define EVDI_CHECKPT() EVDI_VERBOSE("\n")
 #define EVDI_ENTER() EVDI_VERBOSE("enter\n")
 #define EVDI_EXIT() EVDI_VERBOSE("exit\n")
