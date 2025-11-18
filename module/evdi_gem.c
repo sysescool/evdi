@@ -402,6 +402,8 @@ int evdi_gem_mmap(struct drm_file *file,
 	struct drm_gem_object *obj;
 	int ret = 0;
 
+	(void)dev;
+
 	obj = drm_gem_object_lookup(file, handle);
 	if (obj == NULL) {
 		return -ENOENT;
